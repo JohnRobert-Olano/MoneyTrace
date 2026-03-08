@@ -1,0 +1,6 @@
+﻿Analyzing MoneyTrace...                                         
+
+   info - Invalid use of a private type in a public API - lib\screens\add_expense_screen.dart:13:3 - library_private_types_in_public_api
+   info - Invalid use of a private type in a public API - lib\screens\dashboard_screen.dart:14:3 - library_private_types_in_public_api
+   info - Unnecessary use of 'toList' in a spread - lib\screens\dashboard_screen.dart:209:12 - unnecessary_to_list_in_spreads
+
