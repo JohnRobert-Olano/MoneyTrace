@@ -74,7 +74,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Processed instantly via Local Dictionary'),
+            content: Text('✅ Processed instantly via ML Kit (Offline)'),
           ),
         );
         Navigator.pop(context);
@@ -114,18 +114,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return stemmed;
     }).toList();
 
-    // 4. Check against JSON dictionary root words
-    String? matchedCategory;
+    // 4. Check against JSON dictionary root words and tally hits
+    Map<String, int> categoryScores = {};
     final dictionary = DictionaryService.instance.dictionary;
 
     for (var word in stemmedWords) {
       for (var entry in dictionary.entries) {
         if (entry.value.contains(word)) {
-          matchedCategory = entry.key;
-          break;
+          categoryScores[entry.key] = (categoryScores[entry.key] ?? 0) + 1;
         }
       }
-      if (matchedCategory != null) break;
+    }
+
+    String matchedCategory = 'Other';
+    if (categoryScores.isNotEmpty) {
+      matchedCategory = categoryScores.entries
+          .reduce((a, b) => a.value > b.value ? a : b)
+          .key;
     }
 
     // Extract an amount (e.g. 150, 150.00, $15, ₱150)
@@ -139,7 +144,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       amount = double.tryParse(amountMatch.group(1)!);
     }
 
-    if (matchedCategory != null && amount != null) {
+    if (amount != null) {
       return {
         'amount': amount,
         'category': matchedCategory,
@@ -147,7 +152,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       };
     }
 
-    return null; // Fallback to AI
+    return null;
   }
 
   Future<void> _pickImage(ImageSource source) async {
