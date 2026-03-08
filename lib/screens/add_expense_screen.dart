@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:image_picker/image_picker.dart';
 import '../database/db_helper.dart';
 import '../models/expense.dart';
 
@@ -15,13 +18,16 @@ class AddExpenseScreen extends StatefulWidget {
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController _inputController = TextEditingController();
+  final SpeechToText _speechToText = SpeechToText();
+  bool _isListening = false;
+  XFile? _selectedImage;
   bool _isProcessing = false;
   String? _errorMessage;
 
   Future<void> _processExpense() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty) {
-      setState(() => _errorMessage = 'Please enter an expense description.');
+    if (input.isEmpty && _selectedImage == null) {
+      setState(() => _errorMessage = 'Please enter a description or take a receipt photo.');
       return;
     }
 
@@ -41,7 +47,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     try {
       final model = GenerativeModel(
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-1.5-flash-latest',
         apiKey: apiKey,
         generationConfig: GenerationConfig(
           responseMimeType: 'application/json',
@@ -51,8 +57,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
       final prompt =
           '''
-You are a financial assistant extracting expense data from user text.
-Analyze this text: "$input"
+You are a financial assistant extracting expense data from user text or receipt images.
+Analyze this text/image: "$input"
 
 Return ONLY a strictly formatted JSON object with exactly these three keys:
 - "amount": a double representing the cost (extract numbers, ignore currency symbols).
@@ -63,7 +69,19 @@ Example output:
 {"amount": 150.0, "category": "Food", "note": "Lunch at McDonald's"}
 ''';
 
-      final content = [Content.text(prompt)];
+      List<Content> content;
+      if (_selectedImage != null) {
+        final bytes = await _selectedImage!.readAsBytes();
+        content = [
+          Content.multi([
+            TextPart(prompt),
+            DataPart('image/jpeg', bytes),
+          ])
+        ];
+      } else {
+        content = [Content.text(prompt)];
+      }
+
       final response = await model.generateContent(content);
 
       if (response.text == null) {
@@ -93,6 +111,33 @@ Example output:
         _errorMessage = 'Failed to parse expense: ${e.toString()}';
         _isProcessing = false;
       });
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = pickedFile;
+      });
+    }
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        setState(() => _isListening = true);
+        _speechToText.listen(
+          onResult: (val) => setState(() {
+            _inputController.text = val.recognizedWords;
+          }),
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speechToText.stop();
     }
   }
 
@@ -172,6 +217,54 @@ Example output:
               minLines: 2,
             ),
 
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
+                color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                iconSize: 32,
+                onPressed: _listen,
+              ),
+              IconButton(
+                icon: const Icon(Icons.camera_alt),
+                color: Theme.of(context).colorScheme.primary,
+                iconSize: 32,
+                onPressed: () => _pickImage(ImageSource.camera),
+              ),
+              IconButton(
+                icon: const Icon(Icons.photo_library),
+                color: Theme.of(context).colorScheme.primary,
+                iconSize: 32,
+                onPressed: () => _pickImage(ImageSource.gallery),
+              ),
+            ],
+          ),
+          if (_selectedImage != null) ...[
+            const SizedBox(height: 16),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(_selectedImage!.path),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    icon: const Icon(Icons.cancel, color: Colors.white),
+                    onPressed: () => setState(() => _selectedImage = null),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
 
           if (_errorMessage != null) ...[
