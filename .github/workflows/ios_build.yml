@@ -40,6 +40,7 @@ jobs:
 
       - name: Force iOS 16 Deployment Target
         run: |
+          flutter build ios --config-only || true
           sed -i '' "s/^# platform :ios.*/platform :ios, '16.0'/g" ios/Podfile || true
           sed -i '' "s/platform :ios.*/platform :ios, '16.0'/g" ios/Podfile || true
           
