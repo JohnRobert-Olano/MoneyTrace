@@ -7,6 +7,7 @@ import '../models/expense.dart';
 import 'add_expense_screen.dart';
 import 'settings_screen.dart';
 import 'history_screen.dart';
+import 'add_income_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,7 +17,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  double _monthlyTotal = 0.0;
+  double _monthlyTotalBalance = 0.0;
   double _monthlyBudget = 0.0;
   double _projectedSpend = 0.0;
   List<Expense> _recentExpenses = [];
@@ -32,14 +33,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadDashboardData() async {
     final db = DBHelper.instance;
     
-    final total = await db.getMonthlyTotalBalance();
+    final expenses = await db.getMonthlyTotalBalance(); // this returns expense sum
+    final income = await db.getMonthlyTotalIncome();
     final budget = await db.getTotalMonthlyBudget();
     final projection = await db.getProjectedMonthlySpend();
     final recent = await db.getRecentExpenses(5);
     final categoryData = await db.getWeeklyExpensesByCategory();
 
     setState(() {
-      _monthlyTotal = total;
+      _monthlyTotalBalance = income - expenses;
       _monthlyBudget = budget;
       _projectedSpend = projection;
       _recentExpenses = recent;
@@ -90,15 +92,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         body: _buildBody(context),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
-            ).then((_) => _loadDashboardData()); // Refresh on return
-          },
-          child: const Icon(Icons.add),
-        ),
       );
     }
   }
@@ -149,7 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            formatCurrency.format(_monthlyTotal),
+            formatCurrency.format(_monthlyTotalBalance),
             style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
@@ -157,36 +150,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_monthlyBudget > 0) ...[
+          if (_monthlyBudget > 0 && isOverBudget) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: isOverBudget 
-                  ? Colors.redAccent.withAlpha(50) 
-                  : Colors.greenAccent.withAlpha(50),
+                color: Colors.redAccent.withAlpha(50),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: DefaultTextStyle(
-                style: TextStyle(
-                  color: isOverBudget ? Colors.redAccent : Colors.greenAccent,
+              child: Text(
+                'Warning: At this rate, you will overspend by ${formatCurrency.format(_projectedSpend - _monthlyBudget)}',
+                style: const TextStyle(
+                  color: Colors.redAccent,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
-                child: isOverBudget
-                    ? Text('Warning: At this rate, you will overspend by ${formatCurrency.format(_projectedSpend - _monthlyBudget)}')
-                    : Text('Great job! You are projected to stay under budget.'),
               ),
             )
-          ] else ...[
-            Text(
-              'No budget set yet.',
-              style: TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Theme.of(context).colorScheme.onPrimaryContainer.withAlpha(150),
-              ),
-            ),
           ],
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AddIncomeScreen()),
+                  ).then((_) => _loadDashboardData());
+                },
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Add Income'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.withAlpha(50),
+                  foregroundColor: Colors.green,
+                  elevation: 0,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
+                  ).then((_) => _loadDashboardData());
+                },
+                icon: const Icon(Icons.remove_circle_outline),
+                label: const Text('Add Expense'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.withAlpha(50),
+                  foregroundColor: Colors.redAccent,
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

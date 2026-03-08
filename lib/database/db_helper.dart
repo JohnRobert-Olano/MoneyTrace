@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/expense.dart';
 import '../models/budget.dart';
+import '../models/income.dart';
 
 class DBHelper {
   DBHelper._();
@@ -20,8 +21,9 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -43,6 +45,48 @@ class DBHelper {
         monthly_limit REAL NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE income (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount REAL NOT NULL,
+        source TEXT NOT NULL,
+        date TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE income (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          amount REAL NOT NULL,
+          source TEXT NOT NULL,
+          date TEXT NOT NULL
+        )
+      ''');
+    }
+  }
+
+  Future<int> insertIncome(Income income) async {
+    final db = await instance.database;
+    return await db.insert('income', income.toMap());
+  }
+
+  Future<double> getMonthlyTotalIncome() async {
+    final db = await instance.database;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+    
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) as total 
+      FROM income 
+      WHERE date >= ?
+    ''', [startOfMonth]);
+    
+    var total = result.first['total'];
+    return total != null ? (total as num).toDouble() : 0.0;
   }
 
   Future<int> insertExpense(Expense expense) async {
