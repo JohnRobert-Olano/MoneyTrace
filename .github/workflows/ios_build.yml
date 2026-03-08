@@ -38,6 +38,11 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Force iOS 14 Deployment Target
+        run: |
+          sed -i '' "s/^# platform :ios.*/platform :ios, '14.0'/g" ios/Podfile || true
+          sed -i '' "s/platform :ios.*/platform :ios, '14.0'/g" ios/Podfile || true
+          
       - name: Build iOS App without Signing
         run: flutter build ios --release --no-codesign
 
