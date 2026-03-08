@@ -89,7 +89,7 @@ class DBHelper {
         )
       ''');
     }
-    
+
     if (oldVersion < 3) {
       await db.execute('''
         CREATE TABLE goals (
@@ -122,13 +122,16 @@ class DBHelper {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT SUM(amount) as total 
       FROM income 
       WHERE date >= ?
-    ''', [startOfMonth]);
-    
+    ''',
+      [startOfMonth],
+    );
+
     var total = result.first['total'];
     return total != null ? (total as num).toDouble() : 0.0;
   }
@@ -150,38 +153,24 @@ class DBHelper {
 
   Future<List<Expense>> getAllExpenses() async {
     final db = await instance.database;
-    final result = await db.query(
-      'expenses',
-      orderBy: 'date DESC',
-    );
+    final result = await db.query('expenses', orderBy: 'date DESC');
     return result.map((json) => Expense.fromMap(json)).toList();
   }
 
   Future<List<Income>> getAllIncome() async {
     final db = await instance.database;
-    final result = await db.query(
-      'income',
-      orderBy: 'date DESC',
-    );
+    final result = await db.query('income', orderBy: 'date DESC');
     return result.map((json) => Income.fromMap(json)).toList();
   }
 
   Future<int> deleteExpense(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'expenses',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> deleteIncome(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'income',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('income', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> deleteInitialBalance() async {
@@ -196,36 +185,29 @@ class DBHelper {
   Future<int> updateExpense(Map<String, dynamic> row) async {
     final db = await instance.database;
     int id = row['id'];
-    return await db.update(
-      'expenses',
-      row,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.update('expenses', row, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> updateIncome(Map<String, dynamic> row) async {
     final db = await instance.database;
     int id = row['id'];
-    return await db.update(
-      'income',
-      row,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.update('income', row, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<double> getMonthlyTotalBalance() async {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT SUM(amount) as total 
       FROM expenses 
       WHERE date >= ?
-    ''', [startOfMonth]);
-    
+    ''',
+      [startOfMonth],
+    );
+
     var total = result.first['total'];
     return total != null ? (total as num).toDouble() : 0.0;
   }
@@ -234,17 +216,21 @@ class DBHelper {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfWeek = now.subtract(const Duration(days: 7)).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT category, SUM(amount) as total 
       FROM expenses 
       WHERE date >= ?
       GROUP BY category
-    ''', [startOfWeek]);
-    
+    ''',
+      [startOfWeek],
+    );
+
     Map<String, double> categorySums = {};
     for (var row in result) {
-      categorySums[row['category'] as String] = (row['total'] as num).toDouble();
+      categorySums[row['category'] as String] = (row['total'] as num)
+          .toDouble();
     }
     return categorySums;
   }
@@ -253,17 +239,21 @@ class DBHelper {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT category, SUM(amount) as total 
       FROM expenses 
       WHERE date >= ?
       GROUP BY category
-    ''', [startOfMonth]);
-    
+    ''',
+      [startOfMonth],
+    );
+
     Map<String, double> categorySums = {};
     for (var row in result) {
-      categorySums[row['category'] as String] = (row['total'] as num).toDouble();
+      categorySums[row['category'] as String] = (row['total'] as num)
+          .toDouble();
     }
     return categorySums;
   }
@@ -272,13 +262,16 @@ class DBHelper {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT date, amount 
       FROM expenses 
       WHERE date >= ?
-    ''', [startOfMonth]);
-    
+    ''',
+      [startOfMonth],
+    );
+
     // Group by day of month (1-31)
     Map<int, double> dailySums = {};
     for (var row in result) {
@@ -292,7 +285,9 @@ class DBHelper {
 
   Future<double> getTotalMonthlyBudget() async {
     final db = await instance.database;
-    final result = await db.rawQuery('SELECT SUM(monthly_limit) as total FROM budgets');
+    final result = await db.rawQuery(
+      'SELECT SUM(monthly_limit) as total FROM budgets',
+    );
     var total = result.first['total'];
     return total != null ? (total as num).toDouble() : 0.0;
   }
@@ -332,23 +327,30 @@ class DBHelper {
     final db = await instance.database;
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
+
     // Get total spent so far this month
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT SUM(amount) as total 
       FROM expenses 
       WHERE date >= ?
-    ''', [startOfMonth]);
-    
+    ''',
+      [startOfMonth],
+    );
+
     var totalSpent = result.first['total'];
     if (totalSpent == null) return 0.0;
-    
+
     double spent = (totalSpent as num).toDouble();
-    
+
     // Calculate days passed and total days
     int daysPassed = now.day;
-    int totalDays = DateTime(now.year, now.month + 1, 0).day; // Last day of month
-    
+    int totalDays = DateTime(
+      now.year,
+      now.month + 1,
+      0,
+    ).day; // Last day of month
+
     // Predictive math: (spent / days_passed) * total_days
     double averageDailySpend = spent / daysPassed;
     return averageDailySpend * totalDays;
@@ -379,11 +381,7 @@ class DBHelper {
 
   Future<int> deleteGoal(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'goals',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('goals', where: 'id = ?', whereArgs: [id]);
   }
 
   // --- SUBSCRIPTIONS CRUD & LOGIC ---
@@ -411,11 +409,7 @@ class DBHelper {
 
   Future<int> deleteSubscription(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'subscriptions',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('subscriptions', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> processDueSubscriptions() async {
@@ -436,12 +430,14 @@ class DBHelper {
 
         while (now.isAfter(nextBilling) || now.isAtSameMomentAs(nextBilling)) {
           // Log automated expense
-          await insertExpense(Expense(
-            amount: sub.amount,
-            category: sub.category,
-            note: 'Auto-payment: ${sub.name}',
-            date: nextBilling,
-          ));
+          await insertExpense(
+            Expense(
+              amount: sub.amount,
+              category: sub.category,
+              note: 'Auto-payment: ${sub.name}',
+              date: nextBilling,
+            ),
+          );
 
           sub.lastProcessedDate = nextBilling;
           await updateSubscription(sub);

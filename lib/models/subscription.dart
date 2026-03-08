@@ -33,8 +33,8 @@ class Subscription {
       amount: (map['amount'] as num).toDouble(),
       category: map['category'],
       billingDate: map['billing_date'] as int,
-      lastProcessedDate: map['last_processed_date'] != null 
-          ? DateTime.parse(map['last_processed_date']) 
+      lastProcessedDate: map['last_processed_date'] != null
+          ? DateTime.parse(map['last_processed_date'])
           : null,
     );
   }

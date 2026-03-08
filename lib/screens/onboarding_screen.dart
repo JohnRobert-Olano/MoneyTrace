@@ -4,7 +4,6 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../database/db_helper.dart';
 import '../models/income.dart';
-import '../services/local_ai_service.dart';
 import 'dashboard_screen.dart';
 import 'settings_screen.dart';
 
@@ -25,7 +24,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _processInitialAssets() async {
     final input = _inputController.text.trim();
     if (input.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your current assets to start.');
+      setState(
+        () => _errorMessage = 'Please enter your current assets to start.',
+      );
       return;
     }
 
@@ -35,10 +36,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
 
     try {
-      final data = await LocalAIService.instance.parseIncome(
-        'Calculate total assets from: $input. Source must be "Initial Balance".',
+      final amountRegex = RegExp(
+        r'(?:₱|\$|php)?\s*(\d+(?:\.\d+)?)',
+        caseSensitive: false,
       );
-      final amount = (data['amount'] as num).toDouble();
+      final amountMatch = amountRegex.firstMatch(input);
+      if (amountMatch == null) {
+        throw Exception('Could not find a valid number in your input.');
+      }
+
+      final amount = double.parse(amountMatch.group(1)!);
 
       final income = Income(
         amount: amount,
@@ -102,14 +109,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               CupertinoButton(
-                 padding: EdgeInsets.zero,
-                 child: const Icon(CupertinoIcons.settings),
-                 onPressed: () {
-                   Navigator.push(
-                     context,
-                     MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                   );
-                 },
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.settings),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -129,12 +138,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
                 );
               },
             ),
           ],
-        ),body: _buildBody(),
+        ),
+        body: _buildBody(),
       );
     }
   }
@@ -145,11 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(
-            Icons.account_balance,
-            size: 64,
-            color: Colors.teal,
-          ),
+          const Icon(Icons.account_balance, size: 64, color: Colors.teal),
           const SizedBox(height: 16),
           const Text(
             'What are your current total assets?',
@@ -194,10 +202,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                           size: 32,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -213,7 +229,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
                 suffixIcon: GestureDetector(
                   onTapDown: (_) => _startListening(),
                   onTapUp: (_) => _stopListening(),
@@ -226,9 +244,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),

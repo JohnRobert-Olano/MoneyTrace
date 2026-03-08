@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../database/db_helper.dart';
 import '../models/income.dart';
-import '../services/local_ai_service.dart';
 
 class AddIncomeScreen extends StatefulWidget {
   const AddIncomeScreen({super.key});
@@ -32,10 +31,22 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     });
 
     try {
-      final data = await LocalAIService.instance.parseIncome(input);
+      final amountRegex = RegExp(
+        r'(?:₱|\$|php)?\s*(\d+(?:\.\d+)?)',
+        caseSensitive: false,
+      );
+      final amountMatch = amountRegex.firstMatch(input);
+      if (amountMatch == null) {
+        throw Exception('Could not find a valid number in your input.');
+      }
 
-      final amount = (data['amount'] as num).toDouble();
-      final source = data['source'] as String;
+      final amount = double.parse(amountMatch.group(1)!);
+
+      // Basic source extraction: remove the number, take the rest, or just use raw text.
+      String source = input.replaceAll(amountRegex, '').trim();
+      if (source.isEmpty) {
+        source = 'Other Income';
+      }
 
       final income = Income(
         amount: amount,
@@ -47,7 +58,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Processed securely on-device')),
+          const SnackBar(content: Text('✅ Income saved securely')),
         );
         Navigator.pop(context);
       }
@@ -153,10 +164,18 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                           size: 32,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -172,7 +191,9 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
                 suffixIcon: GestureDetector(
                   onTapDown: (_) => _startListening(),
                   onTapUp: (_) => _stopListening(),
@@ -185,9 +206,17 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),

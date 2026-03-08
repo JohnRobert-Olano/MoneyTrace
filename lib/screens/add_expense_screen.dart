@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -7,7 +6,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:image_picker/image_picker.dart';
 import '../database/db_helper.dart';
 import '../models/expense.dart';
-import '../services/local_ai_service.dart';
+import '../services/dictionary_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({super.key});
@@ -27,7 +26,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   Future<void> _processExpense() async {
     final input = _inputController.text.trim();
     if (input.isEmpty && _selectedImage == null) {
-      setState(() => _errorMessage = 'Please enter a description or take a receipt photo.');
+      setState(
+        () => _errorMessage =
+            'Please enter a description or take a receipt photo.',
+      );
       return;
     }
 
@@ -48,8 +50,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         textToAnalyze = recognized.text.isNotEmpty ? recognized.text : input;
       }
 
-      // Run on-device Gemma parsing
-      final data = await LocalAIService.instance.parseExpense(textToAnalyze);
+      Map<String, dynamic>? data = _parseTransactionLocally(textToAnalyze);
+
+      if (data == null) {
+        throw Exception(
+          'Could not parse category or amount. Try being more specific.',
+        );
+      }
 
       final amount = (data['amount'] as num).toDouble();
       final category = data['category'] as String;
@@ -66,7 +73,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Processed securely on-device')),
+          const SnackBar(
+            content: Text('✅ Processed instantly via Local Dictionary'),
+          ),
         );
         Navigator.pop(context);
       }
@@ -76,6 +85,69 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         _isProcessing = false;
       });
     }
+  }
+
+  Map<String, dynamic>? _parseTransactionLocally(String text) {
+    if (!DictionaryService.instance.isLoaded) return null;
+
+    // 1. Convert text to lowercase
+    String normalizedText = text.toLowerCase();
+
+    // 2. Remove punctuation
+    normalizedText = normalizedText.replaceAll(RegExp(r'[^\w\s]'), '');
+
+    // 3. Strip common suffixes from words
+    List<String> words = normalizedText.split(RegExp(r'\s+'));
+    List<String> stemmedWords = words.map((word) {
+      String stemmed = word;
+      if (stemmed.endsWith('ing') && stemmed.length > 3) {
+        stemmed = stemmed.substring(0, stemmed.length - 3);
+      } else if (stemmed.endsWith('ed') && stemmed.length > 2) {
+        stemmed = stemmed.substring(0, stemmed.length - 2);
+      } else if (stemmed.endsWith('es') && stemmed.length > 2) {
+        stemmed = stemmed.substring(0, stemmed.length - 2);
+      } else if (stemmed.endsWith('s') &&
+          !stemmed.endsWith('ss') &&
+          stemmed.length > 2) {
+        stemmed = stemmed.substring(0, stemmed.length - 1);
+      }
+      return stemmed;
+    }).toList();
+
+    // 4. Check against JSON dictionary root words
+    String? matchedCategory;
+    final dictionary = DictionaryService.instance.dictionary;
+
+    for (var word in stemmedWords) {
+      for (var entry in dictionary.entries) {
+        if (entry.value.contains(word)) {
+          matchedCategory = entry.key;
+          break;
+        }
+      }
+      if (matchedCategory != null) break;
+    }
+
+    // Extract an amount (e.g. 150, 150.00, $15, ₱150)
+    final amountRegex = RegExp(
+      r'(?:₱|\$|php)?\s*(\d+(?:\.\d+)?)',
+      caseSensitive: false,
+    );
+    final amountMatch = amountRegex.firstMatch(text);
+    double? amount;
+    if (amountMatch != null) {
+      amount = double.tryParse(amountMatch.group(1)!);
+    }
+
+    if (matchedCategory != null && amount != null) {
+      return {
+        'amount': amount,
+        'category': matchedCategory,
+        'note': text.trim(),
+      };
+    }
+
+    return null; // Fallback to AI
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -182,10 +254,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                           size: 32,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -216,9 +296,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic : Icons.mic_none,
-                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          color: _isListening
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
                         ),
-                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                        Text(
+                          'Hold to speak',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                   ),

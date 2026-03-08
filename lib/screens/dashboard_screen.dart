@@ -11,7 +11,6 @@ import 'add_income_screen.dart';
 import 'reports_screen.dart';
 import 'goals_screen.dart';
 import 'subscriptions_screen.dart';
-import '../services/local_ai_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -29,7 +28,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Expense> _recentExpenses = [];
   Map<String, double> _weeklyCategoryData = {};
   bool _isLoading = true;
-  bool _isAiInstalled = true; // Assume true until check completes
 
   @override
   void initState() {
@@ -40,8 +38,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadDashboardData() async {
     final db = DBHelper.instance;
     await db.processDueSubscriptions();
-    
-    final expenses = await db.getMonthlyTotalBalance(); // this returns expense sum
+
+    final expenses = await db
+        .getMonthlyTotalBalance(); // this returns expense sum
     final income = await db.getMonthlyTotalIncome();
     final budget = await db.getTotalMonthlyBudget();
     final projection = await db.getProjectedMonthlySpend();
@@ -58,14 +57,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _weeklyCategoryData = categoryData;
       _isLoading = false;
     });
-    _checkAiStatus();
-  }
-
-  Future<void> _checkAiStatus() async {
-    final installed = await LocalAIService.instance.isModelInstalled();
-    if (mounted) {
-      setState(() => _isAiInstalled = installed);
-    }
   }
 
   @override
@@ -82,7 +73,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SubscriptionsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const SubscriptionsScreen(),
+                    ),
                   ).then((_) => _loadDashboardData());
                 },
                 child: const Icon(CupertinoIcons.repeat),
@@ -92,7 +85,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const GoalsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const GoalsScreen(),
+                    ),
                   ).then((_) => _loadDashboardData());
                 },
                 child: const Icon(CupertinoIcons.flag),
@@ -102,7 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ReportsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const ReportsScreen(),
+                    ),
                   ).then((_) => _loadDashboardData());
                 },
                 child: const Icon(CupertinoIcons.chart_bar),
@@ -112,7 +109,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
                   ).then((_) => _loadDashboardData());
                 },
                 child: const Icon(CupertinoIcons.settings),
@@ -138,7 +137,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SubscriptionsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SubscriptionsScreen(),
+                  ),
                 ).then((_) => _loadDashboardData());
               },
             ),
@@ -156,7 +157,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ReportsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
                 ).then((_) => _loadDashboardData());
               },
             ),
@@ -165,7 +168,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
                 ).then((_) => _loadDashboardData());
               },
             ),
@@ -179,8 +184,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
       return Center(
-        child: Theme.of(context).platform == TargetPlatform.iOS 
-            ? const CupertinoActivityIndicator() 
+        child: Theme.of(context).platform == TargetPlatform.iOS
+            ? const CupertinoActivityIndicator()
             : const CircularProgressIndicator(),
       );
     }
@@ -190,25 +195,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          if (!_isAiInstalled)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Material(
-                color: Colors.orange.withAlpha(50),
-                borderRadius: BorderRadius.circular(12),
-                child: ListTile(
-                  leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  title: const Text('Offline AI Not Ready', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: const Text('Tap here to download the Gemma 2B-IT model (1.5GB) in Settings.', style: TextStyle(fontSize: 12)),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                    ).then((_) => _loadDashboardData());
-                  },
-                ),
-              ),
-            ),
           _buildHeroSection(),
           const SizedBox(height: 32),
           _buildPieChartSection(),
@@ -221,9 +207,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildHeroSection() {
     final formatCurrency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
-    
+
     bool isOverBudget = _monthlyBudget > 0 && _projectedSpend > _monthlyBudget;
-    
+
     return Column(
       children: [
         Container(
@@ -236,7 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: Theme.of(context).colorScheme.primary.withAlpha(76),
                 blurRadius: 15,
                 offset: const Offset(0, 10),
-              )
+              ),
             ],
           ),
           child: Column(
@@ -244,10 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               const Text(
                 'Primary Savings',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.white70),
               ),
               const SizedBox(height: 8),
               Text(
@@ -267,7 +250,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.arrow_downward, color: Colors.white70, size: 16),
+                          Icon(
+                            Icons.arrow_downward,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Income',
@@ -294,7 +281,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.arrow_upward, color: Colors.white70, size: 16),
+                          Icon(
+                            Icons.arrow_upward,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Outcome',
@@ -321,7 +312,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (_monthlyBudget > 0 && isOverBudget) ...[
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white24,
                     borderRadius: BorderRadius.circular(12),
@@ -334,7 +328,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       fontSize: 14,
                     ),
                   ),
-                )
+                ),
               ],
             ],
           ),
@@ -344,44 +338,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildActionButton(
-               icon: Icons.add,
-               color: Colors.black87,
-               onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AddIncomeScreen()),
-                  ).then((_) => _loadDashboardData());
-               },
+              icon: Icons.add,
+              color: Colors.black87,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddIncomeScreen(),
+                  ),
+                ).then((_) => _loadDashboardData());
+              },
             ),
             _buildActionButton(
-               icon: Icons.remove,
-               color: Colors.black87,
-               onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
-                  ).then((_) => _loadDashboardData());
-               },
+              icon: Icons.remove,
+              color: Colors.black87,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddExpenseScreen(),
+                  ),
+                ).then((_) => _loadDashboardData());
+              },
             ),
             _buildActionButton(
-               icon: Icons.north_east,
-               color: Colors.black87,
-               onTap: () {
-                 Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HistoryScreen()),
-                  ).then((_) => _loadDashboardData());
-               },
+              icon: Icons.north_east,
+              color: Colors.black87,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HistoryScreen(),
+                  ),
+                ).then((_) => _loadDashboardData());
+              },
             ),
             _buildActionButton(
-               icon: Icons.more_horiz,
-               color: Colors.black87,
-               onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                  ).then((_) => _loadDashboardData());
-               },
+              icon: Icons.more_horiz,
+              color: Colors.black87,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                ).then((_) => _loadDashboardData());
+              },
             ),
           ],
         ),
@@ -389,7 +391,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -419,7 +425,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<PieChartSectionData> sections = [];
     int colorIndex = 0;
     final colors = [
-      Colors.blue, Colors.red, Colors.green, Colors.orange, Colors.purple, Colors.teal
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
     ];
 
     _weeklyCategoryData.forEach((category, amount) {
@@ -429,8 +440,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           value: amount,
           title: category,
           radius: 50,
-          titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-        )
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
       );
       colorIndex++;
     });
@@ -475,19 +490,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const HistoryScreen(),
+                  ),
                 ).then((_) => _loadDashboardData());
               },
-              child: const Text('See All', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'See All',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        if (_recentExpenses.isEmpty)
-          const Text('No recent transactions.'),
+        if (_recentExpenses.isEmpty) const Text('No recent transactions.'),
         ..._recentExpenses.map((expense) {
           final isFood = expense.category.toLowerCase().contains('food');
-          final iconColor = isFood ? Colors.orange : Theme.of(context).colorScheme.primary;
+          final iconColor = isFood
+              ? Colors.orange
+              : Theme.of(context).colorScheme.primary;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -500,8 +521,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.black.withAlpha(10),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
-              ]
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -511,16 +532,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     color: iconColor.withAlpha(25),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(isFood ? Icons.fastfood : Icons.receipt_long, color: iconColor),
+                  child: Icon(
+                    isFood ? Icons.fastfood : Icons.receipt_long,
+                    color: iconColor,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(expense.category, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        expense.category,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(expense.note.isNotEmpty ? expense.note : 'Expense', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(
+                        expense.note.isNotEmpty ? expense.note : 'Expense',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -529,12 +565,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Text(
                       '- ${formatCurrency.format(expense.amount)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       dateFormat.format(expense.date),
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -551,7 +594,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 MaterialPageRoute(builder: (context) => const HistoryScreen()),
               ).then((_) => _loadDashboardData());
             },
-            child: const Text('View All History', style: TextStyle(color: Colors.grey)),
+            child: const Text(
+              'View All History',
+              style: TextStyle(color: Colors.grey),
+            ),
           ),
         ),
       ],

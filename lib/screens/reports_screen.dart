@@ -36,7 +36,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _loadData() async {
     final catData = await DBHelper.instance.getMonthlyExpensesByCategory();
     final dailyData = await DBHelper.instance.getDailyExpensesForMonth();
-    
+
     double total = 0.0;
     catData.forEach((_, value) => total += value);
 
@@ -57,18 +57,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
           previousPageTitle: 'Back',
         ),
         child: SafeArea(
-          child: Material(
-            type: MaterialType.transparency,
-            child: _buildBody(),
-          ),
+          child: Material(type: MaterialType.transparency, child: _buildBody()),
         ),
       );
     } else {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Monthly Analytics'),
-          elevation: 0,
-        ),
+        appBar: AppBar(title: const Text('Monthly Analytics'), elevation: 0),
         body: _buildBody(),
       );
     }
@@ -77,14 +71,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return Center(
-        child: Platform.isIOS 
-            ? const CupertinoActivityIndicator() 
+        child: Platform.isIOS
+            ? const CupertinoActivityIndicator()
             : const CircularProgressIndicator(),
       );
     }
 
     if (_categoryData.isEmpty) {
-      return const Center(child: Text("No expenses recorded this month yet.", style: TextStyle(fontSize: 16)));
+      return const Center(
+        child: Text(
+          "No expenses recorded this month yet.",
+          style: TextStyle(fontSize: 16),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -106,14 +105,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text("Total spent", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(
-                      NumberFormat.currency(locale: 'en_PH', symbol: '₱').format(_totalSpent),
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
+                    const Text(
+                      "Total spent",
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                     const SizedBox(height: 4),
-                    const Text("This month", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(
+                      NumberFormat.currency(
+                        locale: 'en_PH',
+                        symbol: '₱',
+                      ).format(_totalSpent),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "This month",
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
                   ],
                 ),
                 PieChart(
@@ -134,10 +146,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 32),
-          SizedBox(
-            height: 250,
-            child: _buildLineChart(),
-          ),
+          SizedBox(height: 250, child: _buildLineChart()),
           const SizedBox(height: 32),
         ],
       ),
@@ -153,7 +162,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         color: color,
         value: entry.value,
         title: '', // Hide title for clean donut look
-        radius: 20, 
+        radius: 20,
       );
     }).toList();
   }
@@ -168,9 +177,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       children: _categoryData.entries.map((entry) {
         final color = _chartColors[colorIndex % _chartColors.length];
         colorIndex++;
-        
-        final percentage = _totalSpent > 0 ? (entry.value / _totalSpent) * 100 : 0.0;
-        
+
+        final percentage = _totalSpent > 0
+            ? (entry.value / _totalSpent) * 100
+            : 0.0;
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -181,19 +192,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 color: Colors.black.withAlpha(5),
                 blurRadius: 5,
                 offset: const Offset(0, 2),
-              )
-            ]
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 12, 
-                height: 12, 
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle)
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
-              Text('${entry.key}  ${percentage.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
+              Text(
+                '${entry.key}  ${percentage.toStringAsFixed(0)}%',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
         );
@@ -204,9 +222,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildLineChart() {
     if (_dailyData.isEmpty) return const SizedBox();
 
-    int daysInMonth = DateTime(DateTime.now().year, DateTime.now().month + 1, 0).day;
+    int daysInMonth = DateTime(
+      DateTime.now().year,
+      DateTime.now().month + 1,
+      0,
+    ).day;
     double maxSpend = 0.0;
-    
+
     List<FlSpot> spots = [];
     for (int day = 1; day <= daysInMonth; day++) {
       double amount = _dailyData[day] ?? 0.0;
@@ -214,7 +236,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       spots.add(FlSpot(day.toDouble(), amount));
     }
 
-    if (maxSpend == 0.0) maxSpend = 100.0; 
+    if (maxSpend == 0.0) maxSpend = 100.0;
 
     return LineChart(
       LineChartData(
@@ -226,8 +248,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         titlesData: FlTitlesData(
           show: true,
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -236,13 +262,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
               getTitlesWidget: (value, meta) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(value.toInt().toString(), style: const TextStyle(fontSize: 12)),
+                  child: Text(
+                    value.toInt().toString(),
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 );
               },
             ),
           ),
         ),
-        borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.withAlpha(50))),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.grey.withAlpha(50)),
+        ),
         minX: 1,
         maxX: daysInMonth.toDouble(),
         minY: 0,

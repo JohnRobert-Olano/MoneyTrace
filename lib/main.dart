@@ -4,21 +4,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/onboarding_screen.dart';
-import 'services/local_ai_service.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'services/dictionary_service.dart';
 
 // Global ValueNotifier to instantly react to Theme changes across the app
 final ValueNotifier<ThemeMode> appThemeNotifier = ValueNotifier(ThemeMode.dark);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await FlutterGemma.initialize();
-  
+
   // Initialize AI in the background so it doesn't block the UI and cause a black screen
-  LocalAIService.instance.initialize().ignore();
-  
+  DictionaryService.instance.initialize().ignore();
+
   final prefs = await SharedPreferences.getInstance();
-  final hasCompletedOnboarding = prefs.getBool('hasCompletedOnboarding') ?? false;
+  final hasCompletedOnboarding =
+      prefs.getBool('hasCompletedOnboarding') ?? false;
 
   // Load saved theme if any
   final savedTheme = prefs.getString('themeMode') ?? 'dark';
@@ -35,7 +34,7 @@ Future<void> main() async {
 
 class MoneyTraceApp extends StatelessWidget {
   final bool hasCompletedOnboarding;
-  
+
   const MoneyTraceApp({super.key, required this.hasCompletedOnboarding});
 
   @override
@@ -44,7 +43,7 @@ class MoneyTraceApp extends StatelessWidget {
       valueListenable: appThemeNotifier,
       builder: (_, ThemeMode currentMode, __) {
         final textTheme = GoogleFonts.poppinsTextTheme();
-        
+
         return MaterialApp(
           title: 'MoneyTrace',
           themeMode: currentMode,
@@ -98,7 +97,9 @@ class MoneyTraceApp extends StatelessWidget {
               ),
             ),
           ),
-          home: hasCompletedOnboarding ? const DashboardScreen() : const OnboardingScreen(),
+          home: hasCompletedOnboarding
+              ? const DashboardScreen()
+              : const OnboardingScreen(),
         );
       },
     );

@@ -49,7 +49,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showEditExpenseModal(Expense expense) {
-    final amountController = TextEditingController(text: expense.amount.toString());
+    final amountController = TextEditingController(
+      text: expense.amount.toString(),
+    );
     final categoryController = TextEditingController(text: expense.category);
     final noteController = TextEditingController(text: expense.note);
 
@@ -79,7 +81,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Amount',
                   border: OutlineInputBorder(),
@@ -104,14 +108,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
-                  final newAmount = double.tryParse(amountController.text) ?? expense.amount;
+                  final newAmount =
+                      double.tryParse(amountController.text) ?? expense.amount;
                   final newCategory = categoryController.text.trim();
                   final newNote = noteController.text.trim();
 
                   final updatedExpenseData = {
                     'id': expense.id,
                     'amount': newAmount,
-                    'category': newCategory.isNotEmpty ? newCategory : expense.category,
+                    'category': newCategory.isNotEmpty
+                        ? newCategory
+                        : expense.category,
                     'note': newNote,
                     'date': expense.date.toIso8601String(),
                   };
@@ -138,7 +145,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showEditIncomeModal(Income income) {
-    final amountController = TextEditingController(text: income.amount.toString());
+    final amountController = TextEditingController(
+      text: income.amount.toString(),
+    );
     final sourceController = TextEditingController(text: income.source);
 
     showModalBottomSheet(
@@ -167,7 +176,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Amount',
                   border: OutlineInputBorder(),
@@ -184,7 +195,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
-                  final newAmount = double.tryParse(amountController.text) ?? income.amount;
+                  final newAmount =
+                      double.tryParse(amountController.text) ?? income.amount;
                   final newSource = sourceController.text.trim();
 
                   final updatedIncomeData = {
@@ -238,10 +250,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   Expanded(
                     child: TabBarView(
-                      children: [
-                        _buildExpensesTab(),
-                        _buildIncomeTab(),
-                      ],
+                      children: [_buildExpensesTab(), _buildIncomeTab()],
                     ),
                   ),
                 ],
@@ -264,12 +273,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ],
             ),
           ),
-          body: TabBarView(
-            children: [
-              _buildExpensesTab(),
-              _buildIncomeTab(),
-            ],
-          ),
+          body: TabBarView(children: [_buildExpensesTab(), _buildIncomeTab()]),
         ),
       );
     }
@@ -278,16 +282,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildExpensesTab() {
     if (_isLoading) {
       return Center(
-        child: Platform.isIOS 
-            ? const CupertinoActivityIndicator() 
+        child: Platform.isIOS
+            ? const CupertinoActivityIndicator()
             : const CircularProgressIndicator(),
       );
     }
 
     if (_expenses.isEmpty) {
-      return const Center(
-        child: Text('No expenses found.'),
-      );
+      return const Center(child: Text('No expenses found.'));
     }
 
     final formatCurrency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
@@ -299,7 +301,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         itemCount: _expenses.length,
         itemBuilder: (context, index) {
           final expense = _expenses[index];
-          
+
           return Dismissible(
             key: Key('exp_${expense.id.toString()}'),
             direction: DismissDirection.endToStart,
@@ -311,9 +313,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             onDismissed: (direction) {
               _deleteExpense(expense);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Expense deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
             },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -325,8 +327,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     color: Colors.black.withAlpha(10),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
-                ]
+                  ),
+                ],
               ),
               child: ListTile(
                 onTap: () => _showEditExpenseModal(expense),
@@ -353,7 +355,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     const SizedBox(height: 4),
                     Text(
                       dateFormat.format(expense.date),
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withAlpha(150)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withAlpha(150),
+                      ),
                     ),
                   ],
                 ),
@@ -377,16 +384,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildIncomeTab() {
     if (_isLoading) {
       return Center(
-        child: Platform.isIOS 
-            ? const CupertinoActivityIndicator() 
+        child: Platform.isIOS
+            ? const CupertinoActivityIndicator()
             : const CircularProgressIndicator(),
       );
     }
 
     if (_incomes.isEmpty) {
-      return const Center(
-        child: Text('No income found.'),
-      );
+      return const Center(child: Text('No income found.'));
     }
 
     final formatCurrency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
@@ -398,7 +403,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         itemCount: _incomes.length,
         itemBuilder: (context, index) {
           final income = _incomes[index];
-          
+
           return Dismissible(
             key: Key('inc_${income.id.toString()}'),
             direction: DismissDirection.endToStart,
@@ -410,9 +415,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             onDismissed: (direction) {
               _deleteIncome(income);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Income deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Income deleted')));
             },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -424,8 +429,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     color: Colors.black.withAlpha(10),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
-                ]
+                  ),
+                ],
               ),
               child: ListTile(
                 onTap: () => _showEditIncomeModal(income),
@@ -448,7 +453,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text(
                     dateFormat.format(income.date),
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withAlpha(150)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(150),
+                    ),
                   ),
                 ),
                 trailing: Text(
