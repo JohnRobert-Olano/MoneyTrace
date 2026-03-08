@@ -1,0 +1,42 @@
+name: iOS Build (No Code Signing)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build iOS App without Signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Package to IPA
+        run: |
+          mkdir -p build/ios/iphoneos/Payload
+          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          cd build/ios/iphoneos
+          zip -qq -r MoneyTrace.ipa Payload
+          cd ../../..
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoneyTrace-iOS-IPA
+          path: build/ios/iphoneos/MoneyTrace.ipa

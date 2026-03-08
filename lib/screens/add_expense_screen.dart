@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:image_picker/image_picker.dart';
 import '../database/db_helper.dart';
 import '../models/expense.dart';
+import '../services/local_ai_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({super.key});
@@ -31,68 +31,29 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return;
     }
 
-    // Retrieve the API key from the .env file securely
-    final apiKey = dotenv.env['GEMINI_API_KEY']?.trim();
-    if (apiKey == null || apiKey.isEmpty || apiKey == 'your_api_key_here') {
-      setState(
-        () => _errorMessage = 'API Key not found or invalid in .env file.',
-      );
-      return;
-    }
-
     setState(() {
       _isProcessing = true;
       _errorMessage = null;
     });
 
     try {
-      final model = GenerativeModel(
-        model: 'gemini-1.5-flash-latest',
-        apiKey: apiKey,
-        generationConfig: GenerationConfig(
-          responseMimeType: 'application/json',
-          temperature: 0.1, // Low temp for more deterministic parsing
-        ),
-      );
+      String textToAnalyze = input;
 
-      final prompt =
-          '''
-You are a financial assistant extracting expense data from user text or receipt images.
-Analyze this text/image: "$input"
-
-Return ONLY a strictly formatted JSON object with exactly these three keys:
-- "amount": a double representing the cost (extract numbers, ignore currency symbols).
-- "category": a short, general category string (e.g., "Food", "Transport", "Utilities", "Entertainment", "Shopping", "Other").
-- "note": a short string describing the specific item or context.
-
-Example output:
-{"amount": 150.0, "category": "Food", "note": "Lunch at McDonald's"}
-''';
-
-      List<Content> content;
+      // If an image was selected, run ML Kit OCR first to extract the text
       if (_selectedImage != null) {
-        final bytes = await _selectedImage!.readAsBytes();
-        content = [
-          Content.multi([
-            TextPart(prompt),
-            DataPart('image/jpeg', bytes),
-          ])
-        ];
-      } else {
-        content = [Content.text(prompt)];
+        final textRecognizer = TextRecognizer();
+        final inputImage = InputImage.fromFilePath(_selectedImage!.path);
+        final recognized = await textRecognizer.processImage(inputImage);
+        await textRecognizer.close(); // Free memory immediately
+        textToAnalyze = recognized.text.isNotEmpty ? recognized.text : input;
       }
 
-      final response = await model.generateContent(content);
+      // Run on-device Gemma parsing
+      final data = await LocalAIService.instance.parseExpense(textToAnalyze);
 
-      if (response.text == null) {
-        throw Exception('Failed to get a response from AI.');
-      }
-
-      final jsonResponse = jsonDecode(response.text!);
-
-      final amount = (jsonResponse['amount'] as num).toDouble();
-      final category = jsonResponse['category'] as String;
-      final note = jsonResponse['note'] as String;
+      final amount = (data['amount'] as num).toDouble();
+      final category = data['category'] as String;
+      final note = data['note'] as String;
 
       final expense = Expense(
         amount: amount,
@@ -104,7 +65,10 @@ Example output:
       await DBHelper.instance.insertExpense(expense);
 
       if (mounted) {
-        Navigator.pop(context); // Go back to Dashboard
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Processed securely on-device')),
+        );
+        Navigator.pop(context);
       }
     } catch (e) {
       setState(() {
@@ -124,7 +88,7 @@ Example output:
     }
   }
 
-  void _listen() async {
+  void _startListening() async {
     if (!_isListening) {
       bool available = await _speechToText.initialize();
       if (available) {
@@ -135,7 +99,11 @@ Example output:
           }),
         );
       }
-    } else {
+    }
+  }
+
+  void _stopListening() {
+    if (_isListening) {
       setState(() => _isListening = false);
       _speechToText.stop();
     }
@@ -188,17 +156,41 @@ Example output:
           const SizedBox(height: 32),
 
           if (Theme.of(context).platform == TargetPlatform.iOS)
-            CupertinoTextField(
-              controller: _inputController,
-              placeholder: 'Type your expense here...',
-              maxLines: 4,
-              minLines: 2,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: CupertinoColors.darkBackgroundGray,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              style: const TextStyle(color: Colors.white),
+            Row(
+              children: [
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _inputController,
+                    placeholder: 'Type your expense here...',
+                    maxLines: 4,
+                    minLines: 2,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.darkBackgroundGray,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                GestureDetector(
+                  onTapDown: (_) => _startListening(),
+                  onTapUp: (_) => _stopListening(),
+                  onTapCancel: _stopListening,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          _isListening ? Icons.mic : Icons.mic_none,
+                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                          size: 32,
+                        ),
+                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             )
           else
             TextField(
@@ -212,6 +204,25 @@ Example output:
                 fillColor: Theme.of(
                   context,
                 ).colorScheme.surfaceContainerHighest,
+                suffixIcon: GestureDetector(
+                  onTapDown: (_) => _startListening(),
+                  onTapUp: (_) => _stopListening(),
+                  onTapCancel: _stopListening,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isListening ? Icons.mic : Icons.mic_none,
+                          color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
+                        ),
+                        Text('Hold to speak', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               maxLines: 4,
               minLines: 2,
@@ -221,12 +232,6 @@ Example output:
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              IconButton(
-                icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
-                color: _isListening ? Colors.red : Theme.of(context).colorScheme.primary,
-                iconSize: 32,
-                onPressed: _listen,
-              ),
               IconButton(
                 icon: const Icon(Icons.camera_alt),
                 color: Theme.of(context).colorScheme.primary,

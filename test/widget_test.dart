@@ -13,7 +13,7 @@ import 'package:money_trace/main.dart';
 void main() {
   testWidgets('App loads smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MoneyTraceApp());
+    await tester.pumpWidget(const MoneyTraceApp(hasCompletedOnboarding: true));
 
     // Verify that Dashboard is present
     expect(find.byType(MaterialApp), findsOneWidget);

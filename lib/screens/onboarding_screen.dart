@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../database/db_helper.dart';
 import '../models/income.dart';
 import '../services/local_ai_service.dart';
+import 'dashboard_screen.dart';
+import 'settings_screen.dart';
 
-class AddIncomeScreen extends StatefulWidget {
-  const AddIncomeScreen({super.key});
+class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
 
   @override
-  _AddIncomeScreenState createState() => _AddIncomeScreenState();
+  _OnboardingScreenState createState() => _OnboardingScreenState();
 }
 
-class _AddIncomeScreenState extends State<AddIncomeScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _inputController = TextEditingController();
   final SpeechToText _speechToText = SpeechToText();
   bool _isListening = false;
   bool _isProcessing = false;
   String? _errorMessage;
 
-  Future<void> _processIncome() async {
+  Future<void> _processInitialAssets() async {
     final input = _inputController.text.trim();
     if (input.isEmpty) {
-      setState(() => _errorMessage = 'Please enter an income description.');
+      setState(() => _errorMessage = 'Please enter your current assets to start.');
       return;
     }
 
@@ -32,28 +35,31 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     });
 
     try {
-      final data = await LocalAIService.instance.parseIncome(input);
-
+      final data = await LocalAIService.instance.parseIncome(
+        'Calculate total assets from: $input. Source must be "Initial Balance".',
+      );
       final amount = (data['amount'] as num).toDouble();
-      final source = data['source'] as String;
 
       final income = Income(
         amount: amount,
-        source: source,
+        source: 'Initial Balance',
         date: DateTime.now(),
       );
 
       await DBHelper.instance.insertIncome(income);
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasCompletedOnboarding', true);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Processed securely on-device')),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
-        Navigator.pop(context);
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to parse income: ${e.toString()}';
+        _errorMessage = 'Failed to analyze assets: ${e.toString()}';
         _isProcessing = false;
       });
     }
@@ -91,8 +97,22 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     if (Theme.of(context).platform == TargetPlatform.iOS) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: const Text('Add Income'),
-          previousPageTitle: 'Back',
+          middle: const Text('Welcome'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                 padding: EdgeInsets.zero,
+                 child: const Icon(CupertinoIcons.settings),
+                 onPressed: () {
+                   Navigator.push(
+                     context,
+                     MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                   );
+                 },
+              ),
+            ],
+          ),
         ),
         child: SafeArea(
           child: Material(type: MaterialType.transparency, child: _buildBody()),
@@ -100,8 +120,21 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
       );
     } else {
       return Scaffold(
-        appBar: AppBar(title: const Text('Add Income'), elevation: 0),
-        body: _buildBody(),
+        appBar: AppBar(
+          title: const Text('Welcome to MoneyTrace'),
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
+              },
+            ),
+          ],
+        ),body: _buildBody(),
       );
     }
   }
@@ -112,17 +145,25 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Icon(
+            Icons.account_balance,
+            size: 64,
+            color: Colors.teal,
+          ),
+          const SizedBox(height: 16),
           const Text(
-            'Describe your income',
+            'What are your current total assets?',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'e.g., "Earned 250 for motor" or "Mom paid me 500"',
+            'e.g., "I have 5000 in GCash and 2000 in my wallet"',
             style: TextStyle(
               fontSize: 14,
               color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
 
@@ -132,7 +173,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                 Expanded(
                   child: CupertinoTextField(
                     controller: _inputController,
-                    placeholder: 'Type your income here...',
+                    placeholder: 'Type your assets here...',
                     maxLines: 4,
                     minLines: 2,
                     padding: const EdgeInsets.all(16),
@@ -167,7 +208,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             TextField(
               controller: _inputController,
               decoration: InputDecoration(
-                hintText: 'Type your income here...',
+                hintText: 'Type your assets here...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -206,6 +247,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                 color: Theme.of(context).colorScheme.error,
                 fontSize: 14,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
           ],
@@ -220,17 +262,17 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             )
           else
             ElevatedButton(
-              onPressed: _processIncome,
+              onPressed: _processInitialAssets,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
               child: const Text(
-                'Analyze & Save',
+                'Finish Setup',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),

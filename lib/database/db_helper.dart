@@ -3,6 +3,8 @@ import 'package:path/path.dart';
 import '../models/expense.dart';
 import '../models/budget.dart';
 import '../models/income.dart';
+import '../models/goal.dart';
+import '../models/subscription.dart';
 
 class DBHelper {
   DBHelper._();
@@ -21,7 +23,7 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -54,6 +56,26 @@ class DBHelper {
         date TEXT NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        target_amount REAL NOT NULL,
+        saved_amount REAL NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL,
+        billing_date INTEGER NOT NULL,
+        last_processed_date TEXT
+      )
+    ''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -64,6 +86,28 @@ class DBHelper {
           amount REAL NOT NULL,
           source TEXT NOT NULL,
           date TEXT NOT NULL
+        )
+      ''');
+    }
+    
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE goals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          target_amount REAL NOT NULL,
+          saved_amount REAL NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          amount REAL NOT NULL,
+          category TEXT NOT NULL,
+          billing_date INTEGER NOT NULL,
+          last_processed_date TEXT
         )
       ''');
     }
@@ -113,10 +157,59 @@ class DBHelper {
     return result.map((json) => Expense.fromMap(json)).toList();
   }
 
+  Future<List<Income>> getAllIncome() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'income',
+      orderBy: 'date DESC',
+    );
+    return result.map((json) => Income.fromMap(json)).toList();
+  }
+
   Future<int> deleteExpense(int id) async {
     final db = await instance.database;
     return await db.delete(
       'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteIncome(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'income',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteInitialBalance() async {
+    final db = await instance.database;
+    return await db.delete(
+      'income',
+      where: 'source = ?',
+      whereArgs: ['Initial Balance'],
+    );
+  }
+
+  Future<int> updateExpense(Map<String, dynamic> row) async {
+    final db = await instance.database;
+    int id = row['id'];
+    return await db.update(
+      'expenses',
+      row,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> updateIncome(Map<String, dynamic> row) async {
+    final db = await instance.database;
+    int id = row['id'];
+    return await db.update(
+      'income',
+      row,
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -154,6 +247,47 @@ class DBHelper {
       categorySums[row['category'] as String] = (row['total'] as num).toDouble();
     }
     return categorySums;
+  }
+
+  Future<Map<String, double>> getMonthlyExpensesByCategory() async {
+    final db = await instance.database;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+    
+    final result = await db.rawQuery('''
+      SELECT category, SUM(amount) as total 
+      FROM expenses 
+      WHERE date >= ?
+      GROUP BY category
+    ''', [startOfMonth]);
+    
+    Map<String, double> categorySums = {};
+    for (var row in result) {
+      categorySums[row['category'] as String] = (row['total'] as num).toDouble();
+    }
+    return categorySums;
+  }
+
+  Future<Map<int, double>> getDailyExpensesForMonth() async {
+    final db = await instance.database;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+    
+    final result = await db.rawQuery('''
+      SELECT date, amount 
+      FROM expenses 
+      WHERE date >= ?
+    ''', [startOfMonth]);
+    
+    // Group by day of month (1-31)
+    Map<int, double> dailySums = {};
+    for (var row in result) {
+      DateTime rowDate = DateTime.parse(row['date'] as String);
+      int day = rowDate.day;
+      double amount = (row['amount'] as num).toDouble();
+      dailySums[day] = (dailySums[day] ?? 0) + amount;
+    }
+    return dailySums;
   }
 
   Future<double> getTotalMonthlyBudget() async {
@@ -218,5 +352,108 @@ class DBHelper {
     // Predictive math: (spent / days_passed) * total_days
     double averageDailySpend = spent / daysPassed;
     return averageDailySpend * totalDays;
+  }
+
+  // --- GOALS CRUD ---
+
+  Future<int> insertGoal(Goal goal) async {
+    final db = await instance.database;
+    return await db.insert('goals', goal.toMap());
+  }
+
+  Future<List<Goal>> getAllGoals() async {
+    final db = await instance.database;
+    final result = await db.query('goals');
+    return result.map((json) => Goal.fromMap(json)).toList();
+  }
+
+  Future<int> updateGoal(Goal goal) async {
+    final db = await instance.database;
+    return await db.update(
+      'goals',
+      goal.toMap(),
+      where: 'id = ?',
+      whereArgs: [goal.id],
+    );
+  }
+
+  Future<int> deleteGoal(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'goals',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- SUBSCRIPTIONS CRUD & LOGIC ---
+
+  Future<int> insertSubscription(Subscription sub) async {
+    final db = await instance.database;
+    return await db.insert('subscriptions', sub.toMap());
+  }
+
+  Future<List<Subscription>> getAllSubscriptions() async {
+    final db = await instance.database;
+    final result = await db.query('subscriptions');
+    return result.map((json) => Subscription.fromMap(json)).toList();
+  }
+
+  Future<int> updateSubscription(Subscription sub) async {
+    final db = await instance.database;
+    return await db.update(
+      'subscriptions',
+      sub.toMap(),
+      where: 'id = ?',
+      whereArgs: [sub.id],
+    );
+  }
+
+  Future<int> deleteSubscription(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'subscriptions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> processDueSubscriptions() async {
+    final subs = await getAllSubscriptions();
+    final now = DateTime.now();
+
+    for (var sub in subs) {
+      if (sub.lastProcessedDate == null) {
+        // Initialize newly created subscriptions to start billing from next cycle
+        sub.lastProcessedDate = now;
+        await updateSubscription(sub);
+      } else {
+        DateTime nextBilling = DateTime(
+          sub.lastProcessedDate!.year,
+          sub.lastProcessedDate!.month + 1,
+          sub.billingDate,
+        );
+
+        while (now.isAfter(nextBilling) || now.isAtSameMomentAs(nextBilling)) {
+          // Log automated expense
+          await insertExpense(Expense(
+            amount: sub.amount,
+            category: sub.category,
+            note: 'Auto-payment: ${sub.name}',
+            date: nextBilling,
+          ));
+
+          sub.lastProcessedDate = nextBilling;
+          await updateSubscription(sub);
+
+          // Prepare for next loop evaluation
+          nextBilling = DateTime(
+            nextBilling.year,
+            nextBilling.month + 1,
+            sub.billingDate,
+          );
+        }
+      }
+    }
   }
 }
