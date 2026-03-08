@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/expense.dart';
+import '../models/budget.dart';
 
 class DBHelper {
   DBHelper._();
@@ -59,6 +60,24 @@ class DBHelper {
     return result.map((json) => Expense.fromMap(json)).toList();
   }
 
+  Future<List<Expense>> getAllExpenses() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'expenses',
+      orderBy: 'date DESC',
+    );
+    return result.map((json) => Expense.fromMap(json)).toList();
+  }
+
+  Future<int> deleteExpense(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<double> getMonthlyTotalBalance() async {
     final db = await instance.database;
     final now = DateTime.now();
@@ -91,5 +110,69 @@ class DBHelper {
       categorySums[row['category'] as String] = (row['total'] as num).toDouble();
     }
     return categorySums;
+  }
+
+  Future<double> getTotalMonthlyBudget() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT SUM(monthly_limit) as total FROM budgets');
+    var total = result.first['total'];
+    return total != null ? (total as num).toDouble() : 0.0;
+  }
+
+  Future<List<Budget>> getAllBudgets() async {
+    final db = await instance.database;
+    final result = await db.query('budgets');
+    return result.map((json) => Budget.fromMap(json)).toList();
+  }
+
+  Future<void> upsertBudget(String category, double limit) async {
+    final db = await instance.database;
+    final existingParams = await db.query(
+      'budgets',
+      where: 'category = ?',
+      whereArgs: [category],
+    );
+
+    if (existingParams.isNotEmpty) {
+      // Update
+      await db.update(
+        'budgets',
+        {'monthly_limit': limit},
+        where: 'category = ?',
+        whereArgs: [category],
+      );
+    } else {
+      // Insert
+      await db.insert('budgets', {
+        'category': category,
+        'monthly_limit': limit,
+      });
+    }
+  }
+
+  Future<double> getProjectedMonthlySpend() async {
+    final db = await instance.database;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+    
+    // Get total spent so far this month
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) as total 
+      FROM expenses 
+      WHERE date >= ?
+    ''', [startOfMonth]);
+    
+    var totalSpent = result.first['total'];
+    if (totalSpent == null) return 0.0;
+    
+    double spent = (totalSpent as num).toDouble();
+    
+    // Calculate days passed and total days
+    int daysPassed = now.day;
+    int totalDays = DateTime(now.year, now.month + 1, 0).day; // Last day of month
+    
+    // Predictive math: (spent / days_passed) * total_days
+    double averageDailySpend = spent / daysPassed;
+    return averageDailySpend * totalDays;
   }
 }

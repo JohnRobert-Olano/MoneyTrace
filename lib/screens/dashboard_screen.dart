@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -6,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/expense.dart';
 import 'add_expense_screen.dart';
+import 'settings_screen.dart';
+import 'history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,6 +17,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   double _monthlyTotal = 0.0;
+  double _monthlyBudget = 0.0;
+  double _projectedSpend = 0.0;
   List<Expense> _recentExpenses = [];
   Map<String, double> _weeklyCategoryData = {};
   bool _isLoading = true;
@@ -30,11 +33,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final db = DBHelper.instance;
     
     final total = await db.getMonthlyTotalBalance();
+    final budget = await db.getTotalMonthlyBudget();
+    final projection = await db.getProjectedMonthlySpend();
     final recent = await db.getRecentExpenses(5);
     final categoryData = await db.getWeeklyExpensesByCategory();
 
     setState(() {
       _monthlyTotal = total;
+      _monthlyBudget = budget;
+      _projectedSpend = projection;
       _recentExpenses = recent;
       _weeklyCategoryData = categoryData;
       _isLoading = false;
@@ -43,10 +50,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (Platform.isIOS) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(
-          middle: Text('Dashboard'),
+        navigationBar: CupertinoNavigationBar(
+          middle: const Text('Dashboard'),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              ).then((_) => _loadDashboardData());
+            },
+            child: const Icon(CupertinoIcons.settings),
+          ),
         ),
         child: SafeArea(
           child: Material(
@@ -60,6 +77,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         appBar: AppBar(
           title: const Text('Dashboard'),
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                ).then((_) => _loadDashboardData());
+              },
+            ),
+          ],
         ),
         body: _buildBody(context),
         floatingActionButton: FloatingActionButton(
@@ -78,7 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
       return Center(
-        child: Platform.isIOS 
+        child: Theme.of(context).platform == TargetPlatform.iOS 
             ? const CupertinoActivityIndicator() 
             : const CircularProgressIndicator(),
       );
@@ -101,6 +129,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildHeroSection() {
     final formatCurrency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
+    
+    bool isOverBudget = _monthlyBudget > 0 && _projectedSpend > _monthlyBudget;
     
     return Container(
       padding: const EdgeInsets.all(24.0),
@@ -126,6 +156,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
           ),
+          const SizedBox(height: 16),
+          if (_monthlyBudget > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isOverBudget 
+                  ? Colors.redAccent.withAlpha(50) 
+                  : Colors.greenAccent.withAlpha(50),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DefaultTextStyle(
+                style: TextStyle(
+                  color: isOverBudget ? Colors.redAccent : Colors.greenAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                child: isOverBudget
+                    ? Text('Warning: At this rate, you will overspend by ${formatCurrency.format(_projectedSpend - _monthlyBudget)}')
+                    : Text('Great job! You are projected to stay under budget.'),
+              ),
+            )
+          ] else ...[
+            Text(
+              'No budget set yet.',
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).colorScheme.onPrimaryContainer.withAlpha(150),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -184,9 +245,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Recent Transactions',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Transactions',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                ).then((_) => _loadDashboardData());
+              },
+              child: const Text('See All'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         if (_recentExpenses.isEmpty)

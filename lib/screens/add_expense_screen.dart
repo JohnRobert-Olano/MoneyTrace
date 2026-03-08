@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'dart:io' show Platform;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../database/db_helper.dart';
@@ -27,9 +26,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
 
     // Retrieve the API key from the .env file securely
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    final apiKey = dotenv.env['GEMINI_API_KEY']?.trim();
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_api_key_here') {
-      setState(() => _errorMessage = 'API Key not found or invalid in .env file.');
+      setState(
+        () => _errorMessage = 'API Key not found or invalid in .env file.',
+      );
       return;
     }
 
@@ -40,15 +41,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     try {
       final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3-flash-preview',
         apiKey: apiKey,
         generationConfig: GenerationConfig(
-            responseMimeType: 'application/json',
-            temperature: 0.1, // Low temp for more deterministic parsing
+          responseMimeType: 'application/json',
+          temperature: 0.1, // Low temp for more deterministic parsing
         ),
       );
 
-      final prompt = '''
+      final prompt =
+          '''
 You are a financial assistant extracting expense data from user text.
 Analyze this text: "$input"
 
@@ -63,13 +65,13 @@ Example output:
 
       final content = [Content.text(prompt)];
       final response = await model.generateContent(content);
-      
+
       if (response.text == null) {
         throw Exception('Failed to get a response from AI.');
       }
 
       final jsonResponse = jsonDecode(response.text!);
-      
+
       final amount = (jsonResponse['amount'] as num).toDouble();
       final category = jsonResponse['category'] as String;
       final note = jsonResponse['note'] as String;
@@ -82,11 +84,10 @@ Example output:
       );
 
       await DBHelper.instance.insertExpense(expense);
-      
+
       if (mounted) {
         Navigator.pop(context); // Go back to Dashboard
       }
-
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to parse expense: ${e.toString()}';
@@ -103,25 +104,19 @@ Example output:
 
   @override
   Widget build(BuildContext context) {
-    if (Platform.isIOS) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: const Text('Add Expense'),
           previousPageTitle: 'Back',
         ),
         child: SafeArea(
-          child: Material(
-            type: MaterialType.transparency,
-            child: _buildBody(),
-          ),
+          child: Material(type: MaterialType.transparency, child: _buildBody()),
         ),
       );
     } else {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Add Expense'),
-          elevation: 0,
-        ),
+        appBar: AppBar(title: const Text('Add Expense'), elevation: 0),
         body: _buildBody(),
       );
     }
@@ -135,10 +130,7 @@ Example output:
         children: [
           const Text(
             'Describe your expense',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -149,8 +141,8 @@ Example output:
             ),
           ),
           const SizedBox(height: 32),
-          
-          if (Platform.isIOS)
+
+          if (Theme.of(context).platform == TargetPlatform.iOS)
             CupertinoTextField(
               controller: _inputController,
               placeholder: 'Type your expense here...',
@@ -172,14 +164,16 @@ Example output:
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
               ),
               maxLines: 4,
               minLines: 2,
             ),
-            
+
           const SizedBox(height: 24),
-          
+
           if (_errorMessage != null) ...[
             Text(
               _errorMessage!,
@@ -195,8 +189,8 @@ Example output:
 
           if (_isProcessing)
             Center(
-              child: Platform.isIOS 
-                  ? const CupertinoActivityIndicator() 
+              child: Theme.of(context).platform == TargetPlatform.iOS
+                  ? const CupertinoActivityIndicator()
                   : const CircularProgressIndicator(),
             )
           else
